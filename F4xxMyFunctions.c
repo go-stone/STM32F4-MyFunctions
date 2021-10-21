@@ -6,7 +6,7 @@
 #include "F4xxMyFunctions.h"
 #include "stm32f4xx.h"
 /**
- * @brief 将指定引脚组的指定引脚初始化为推挽输出，引脚速率为25MHz，引脚电平下拉
+ * @brief (简化为Simplified_GPIOx_OutPutPP_Init)将指定引脚组的指定引脚初始化为推挽输出，引脚速率为25MHz，引脚电平下拉
  * @param RCC_AHB_GPIOx外设，GPIO结构体，引脚编号，引脚编组
  * @retval void
  * */
@@ -21,7 +21,7 @@ void GPIOx_OutPP_Init(uint32_t RCC_AHB_GPIOx, GPIO_InitTypeDef *GPIO_ITD, uint16
     GPIO_Init(GPIOx, GPIO_ITD);
 }
 /**
- * @brief 初始化指定的定时器，并指定其预分频系数和计数周期(已经-1，为真实系数和周期)，常与NVICx_Init()配合使用
+ * @brief (简化为Simplified_TIMx_Init)初始化指定的定时器，并指定其预分频系数和计数周期(已经-1，为真实系数和周期)，常与NVICx_Init()配合使用
  * @param RCC_APBx_TIMx外设，TIM时基结构体，TIMx，真实预分频系数，真实计数周期
  * @retval void
  * */
@@ -44,7 +44,7 @@ void TIMx_Init(uint32_t RCC_APBx_TIMx, TIM_TimeBaseInitTypeDef *TIM_TBITD, TIM_T
     TIM_Cmd(TIMx, ENABLE);
 }
 /**
- * @brief 初始化指定的内嵌向量中断，通常与TIMx_Init()配合使用
+ * @brief (简化为Simplified_NVICx_Init)初始化指定的内嵌向量中断，通常与TIMx_Init()配合使用
  * @param NVIC中断结构体，IRQn中断通道，抢占优先级(0~3)，响应优先级(0~3)
  * @retval void
  * */
@@ -75,7 +75,7 @@ void Flip_GPIO_Out(GPIO_TypeDef *GPIOx, uint16_t Pinx)
     }
 }
 /**
- * @brief 将指定GPIOx的指定引脚设为输入模式，引脚速率25MHz，引脚电平下拉
+ * @brief (简化为Simplified_GPIOx_Input_Init)将指定GPIOx的指定引脚设为输入模式，引脚速率25MHz，引脚电平下拉
  * @param RCC_AHB_GPIO外设，GPIO结构体，GPIOx编组，引脚编号
  * @retval void
  * */
@@ -89,7 +89,7 @@ void GPIOx_Input_Init(uint32_t RCC_AHB_GPIOx, GPIO_InitTypeDef *GPIO_ITD, GPIO_T
     GPIO_Init(GPIOx, GPIO_ITD);
 }
 /**
- * @brief 初始化指定的ADCx和ADC的通道Channelx，并将采样频率设为四分频(21MHz)
+ * @brief (简化为Simplified_ADCx_Init)初始化指定的ADCx和ADC的通道Channelx，并将采样频率设为四分频(21MHz)
  * @param RCC_GPIOx外设，RCC_ADCx外设，GPIO结构体，引脚编号，GPIOx组别，ADC_CommonInitTypeDef结构体，ADC_InitTypeDef结构体，ADCx组别，数据对齐方式，分辨率(位数)
  * @retval void
  * */
@@ -140,6 +140,11 @@ int Get_ADC_Average(uint8_t ADC_Channelx, int AVG_Times, ADC_TypeDef *ADCx, uint
     AVG_Value = Temp_Value / AVG_Times;
     return AVG_Value;
 }
+/**
+ * @brief 简化了GPIOx_Out_PP_Init(),将结构体的定义放在了函数体内；将GPIOx初始化为推挽输出，引脚速率为25MHz
+ * @param RCC_AHB_GPIOx外设，pinx引脚编号，GPIOx引脚组别
+ * @retval void
+ * */
 void Simplified_GPIOx_OutPutPP_Init(uint32_t RCC_AHB_GPIOx, uint32_t Pinx, GPIO_TypeDef *GPIOx)
 {
     GPIO_InitTypeDef GPIO_ITD;
@@ -151,6 +156,11 @@ void Simplified_GPIOx_OutPutPP_Init(uint32_t RCC_AHB_GPIOx, uint32_t Pinx, GPIO_
     GPIO_ITD.GPIO_Pin = Pinx;
     GPIO_Init(GPIOx, &GPIO_ITD);
 }
+/**
+ * @brief 简化后的TIMx初始化函数，初始化为向上计数，使能Update中断
+ * @param RCC_APBx_TIMx，TIMx组别，APBx时钟线，预分频系数，重装载值
+ * @retval void
+ * */
 void Simplified_TIMx_Init(uint32_t RCC_APBx_TIMx, TIM_TypeDef *TIMx, int APBx, int T_psc, int T_per)
 {
     TIM_TimeBaseInitTypeDef TIM_TBITD;
@@ -170,16 +180,26 @@ void Simplified_TIMx_Init(uint32_t RCC_APBx_TIMx, TIM_TypeDef *TIMx, int APBx, i
     TIM_ITConfig(TIMx, TIM_IT_Update, ENABLE);
     TIM_Cmd(TIMx, ENABLE);
 }
+/**
+ * @brief 简化后的NVICx初始化函数，指定了优先级分组为NVIC_PriorityGroup_2
+ * @param IRQ通道，抢占优先级（主），响应优先级（次）
+ * @retval void
+ * */
 void Simplified_NVICx_Init(uint8_t IRQChannel, int Main_Pri, int Sub_Pri)
 {
-    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
     NVIC_InitTypeDef NVIC_ITD;
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
     NVIC_ITD.NVIC_IRQChannel = IRQChannel;
     NVIC_ITD.NVIC_IRQChannelCmd = ENABLE;
     NVIC_ITD.NVIC_IRQChannelPreemptionPriority = Main_Pri;
     NVIC_ITD.NVIC_IRQChannelSubPriority = Sub_Pri;
     NVIC_Init(&NVIC_ITD);
 }
+/**
+ * @brief 将指定的引脚指定为输入模式，电平下拉，引脚速率25MHz
+ * @param RCC_AHB_GPIOx外设，GPIOx，Pinx引脚编号
+ * @retval void
+ * */
 void Simplified_GPIOx_Input_Init(uint32_t RCC_AHB_GPIOx, GPIO_TypeDef *GPIOx, uint16_t Pinx)
 {
     GPIO_InitTypeDef GPIO_ITD;
@@ -190,7 +210,12 @@ void Simplified_GPIOx_Input_Init(uint32_t RCC_AHB_GPIOx, GPIO_TypeDef *GPIOx, ui
     GPIO_ITD.GPIO_Pin = Pinx;
     GPIO_Init(GPIOx, &GPIO_ITD);
 }
-void Simplified_ADCx_Init(uint32_t RCC_GPIOx, uint32_t RCC_ADCx, uint16_t Pinx, GPIO_TypeDef *GPIOx, ADC_TypeDef *ADCx, uint32_t Data_Align, uint32_t Resolution)
+/**
+ * @brief 初始化指定的ADCx，时钟4分频(21MHz),采样间隔5个时钟脉冲，独立模式，DMA失能，数据右对齐，禁用扫描和连续转换，无外部触发边沿
+ * @param RCC_AHB_GPIOx外设，RCC_ADCx外设，Pinx引脚编号，GPIOx，ADCx，ADC分辨率
+ * @retval void
+ * */
+void Simplified_ADCx_Init(uint32_t RCC_GPIOx, uint32_t RCC_ADCx, uint16_t Pinx, GPIO_TypeDef *GPIOx, ADC_TypeDef *ADCx, uint32_t Resolution)
 {
     GPIO_InitTypeDef GPIO_ITD;
     ADC_CommonInitTypeDef ADC_CITD;
@@ -212,7 +237,7 @@ void Simplified_ADCx_Init(uint32_t RCC_GPIOx, uint32_t RCC_ADCx, uint16_t Pinx, 
     ADC_ITD.ADC_ScanConvMode = DISABLE;
     ADC_ITD.ADC_ContinuousConvMode = DISABLE;
     ADC_ITD.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
-    ADC_ITD.ADC_DataAlign = Data_Align;
+    ADC_ITD.ADC_DataAlign = ADC_DataAlign_Right;
     ADC_ITD.ADC_Resolution = Resolution;
     ADC_ITD.ADC_NbrOfConversion = 1;
     ADC_Init(ADCx, &ADC_ITD);
