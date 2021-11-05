@@ -7,6 +7,9 @@ Welcome to communicate<br>
 Please feel free to use<br>
 Pull request if you want<br>
 ## 版本说明 Versions Introduction
+### v1.6版本 Version 1.6
+增加了输入捕获有关的函数，未完全完成，大概会在下个版本补充完整并且更新对应的chm手册<br>
+Add some functions about input capture(not completly finished).I will probably complete it in next version and update the CHM reference manual.<br>
 ### v1.5版本 Version 1.5
 增加了帮助手册(中文和英文均有)STM32F4MyHelpManual.chm (v1.0)<br>
 Add Help Manuals(including Chinese version and English Version)STM32F4MyHelpManual.chm (v1.0)<br>

@@ -15,3 +15,5 @@ void Simplified_TIMx_Init(uint32_t RCC_APBx_TIMx, TIM_TypeDef *TIMx, int APBx, i
 void Simplified_NVICx_Init(uint8_t IRQChannel, int Main_Pri, int Sub_Pri);
 void Simplified_GPIOx_Input_Init(uint32_t RCC_AHB_GPIOx, GPIO_TypeDef *GPIOx, uint16_t Pinx);
 void Simplified_ADCx_Init(uint32_t RCC_GPIOx, uint32_t RCC_ADCx, uint16_t Pinx, GPIO_TypeDef *GPIOx, ADC_TypeDef *ADCx, uint32_t Resolution);
+void TIM_InputCaptureInit(uint32_t RCC_GPIO, uint32_t RCC_TIM, int APBx, uint32_t Pinx, GPIO_TypeDef *GPIOx, uint16_t Pinsrc, uint8_t AF_TIM, TIM_TypeDef *TIMx, uint16_t TIM_CHN, uint8_t TIMx_IRQn, uint16_t IT_CC, int TIM_psc);
+void CalculateHighTime_InTIM(uint8_t *STA, uint32_t *VAL, TIM_TypeDef *TIMx, uint16_t IT_CC);

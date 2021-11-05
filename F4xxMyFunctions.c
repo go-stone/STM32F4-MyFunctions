@@ -243,3 +243,109 @@ void Simplified_ADCx_Init(uint32_t RCC_GPIOx, uint32_t RCC_ADCx, uint16_t Pinx, 
     ADC_Init(ADCx, &ADC_ITD);
     ADC_Cmd(ADCx, ENABLE);
 }
+/**
+ * @brief 将指定的引脚上指定的TIM通道初始化为输入捕获模式
+ * @param RCC_GPIO外设,RCC_TIM外设，TIM时钟线APBx，GPIO引脚编号，GPIOx，引脚复用GPIO_Pinsoure_x,GPIO复用的TIM编号，TIMx，TIM通道，TIM中断通道，TIM_IT_CCx,TIM分频系数(已经-1)
+ * @retval void
+ * */
+void TIM_InputCaptureInit(uint32_t RCC_GPIO, uint32_t RCC_TIM, int APBx, uint32_t Pinx, GPIO_TypeDef *GPIOx, uint16_t Pinsrc, uint8_t AF_TIM, TIM_TypeDef *TIMx, uint16_t TIM_CHN, uint8_t TIMx_IRQn, uint16_t IT_CC, int TIM_psc)
+{
+    GPIO_InitTypeDef GPIO_ITD;
+    TIM_TimeBaseInitTypeDef TIM_TBITD;
+    TIM_ICInitTypeDef TIM_ICITD;
+    NVIC_InitTypeDef NVIC_ITD;
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
+    RCC_AHB1PeriphClockCmd(RCC_GPIO, ENABLE);
+    if (APBx == 1)
+    {
+        RCC_APB1PeriphClockCmd(RCC_TIM, ENABLE);
+    }
+    else if (APBx == 2)
+    {
+        RCC_APB2PeriphClockCmd(RCC_TIM, ENABLE);
+    }
+    GPIO_ITD.GPIO_Mode = GPIO_Mode_AF;
+    GPIO_ITD.GPIO_OType = GPIO_OType_PP;
+    GPIO_ITD.GPIO_Speed = GPIO_Speed_100MHz;
+    GPIO_ITD.GPIO_PuPd = GPIO_PuPd_DOWN;
+    GPIO_ITD.GPIO_Pin = Pinx;
+    GPIO_Init(GPIOx, &GPIO_ITD);
+
+    GPIO_PinAFConfig(GPIOx, Pinsrc, AF_TIM);
+    TIM_TBITD.TIM_ClockDivision = TIM_CKD_DIV1;
+    TIM_TBITD.TIM_CounterMode = TIM_CounterMode_Up;
+    TIM_TBITD.TIM_Prescaler = TIM_psc - 1;
+    TIM_TBITD.TIM_Period = 0xFFFFFFFF;
+    TIM_TimeBaseInit(TIMx, &TIM_TBITD);
+
+    TIM_ICITD.TIM_ICFilter = 0x0;
+    TIM_ICITD.TIM_ICPolarity = TIM_ICPolarity_Rising;
+    TIM_ICITD.TIM_Channel = TIM_CHN;
+    TIM_ICITD.TIM_ICPrescaler = TIM_ICPSC_DIV1;
+    TIM_ICITD.TIM_ICSelection = TIM_ICSelection_DirectTI;
+    TIM_ICInit(TIMx, &TIM_ICITD);
+    TIM_ITConfig(TIMx, TIM_IT_Update, ENABLE);
+    TIM_ITConfig(TIMx, IT_CC, ENABLE);
+    TIM_Cmd(TIMx, ENABLE);
+
+    NVIC_ITD.NVIC_IRQChannel = TIMx_IRQn;
+    NVIC_ITD.NVIC_IRQChannelPreemptionPriority = 1;
+    NVIC_ITD.NVIC_IRQChannelSubPriority = 1;
+    NVIC_ITD.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_ITD);
+}
+/**
+ * @brief 计算捕获的高电平时间，要结合Usart_ShowHighTime()使用
+ * @param *STA,用于判断是否捕获,*VAL，用于存储高电平时间，TIMx，TIM_IT_CCx
+ * @retval void
+ **/
+void CalculateHighTime_InTIM(uint8_t *STA, uint32_t *VAL, TIM_TypeDef *TIMx, uint16_t IT_CC)
+{
+    uint8_t CAP_STA = *STA;
+    uint32_t CAP_VAL = *VAL;
+    if ((CAP_STA & 0X80) == 0) //还未成功捕获
+    {
+        if (TIM_GetITStatus(TIMx, TIM_IT_Update) != RESET) //溢出
+        {
+            if (CAP_STA & 0X40) //已经捕获到高电平了
+            {
+                if ((CAP_STA & 0X3F) == 0X3F) //高电平太长了
+                {
+                    CAP_STA |= 0X80; //标记成功捕获了一次
+                    CAP_VAL = 0XFFFFFFFF;
+                    *STA = CAP_STA;
+                    *VAL = CAP_VAL;
+                }
+                else
+                {
+                    CAP_STA++;
+                    *STA = CAP_STA;
+                }
+            }
+        }
+        if (TIM_GetITStatus(TIMx, IT_CC) != RESET) //捕获1发生捕获事件
+        {
+            if (CAP_STA & 0X40) //捕获到一个下降沿
+            {
+                CAP_STA |= 0X80;                 //标记成功捕获到一次高电平脉宽
+                CAP_VAL = TIM_GetCapture1(TIMx); //获取当前的捕获值.
+                *STA = CAP_STA;
+                *VAL = CAP_VAL;
+                TIM_OC1PolarityConfig(TIMx, TIM_ICPolarity_Rising); //CC1P=0 设置为上升沿捕获
+            }
+            else //还未开始,第一次捕获上升沿
+            {
+                CAP_STA = 0; //清空
+                CAP_VAL = 0;
+                CAP_STA |= 0X40; //标记捕获到了上升沿
+                *STA = CAP_STA;
+                *VAL = CAP_VAL;
+                TIM_Cmd(TIMx, DISABLE); //关闭定时器3
+                TIM_SetCounter(TIMx, 0);
+                TIM_OC1PolarityConfig(TIMx, TIM_ICPolarity_Falling); //CC1P=1 设置为下降沿捕获
+                TIM_Cmd(TIMx, ENABLE);                               //使能定时器3
+            }
+        }
+    }
+    TIM_ClearITPendingBit(TIMx, IT_CC | TIM_IT_Update); //清除中断标志位
+}
