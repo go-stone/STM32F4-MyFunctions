@@ -211,39 +211,6 @@ void Simplified_GPIOx_Input_Init(uint32_t RCC_AHB_GPIOx, GPIO_TypeDef *GPIOx, ui
     GPIO_Init(GPIOx, &GPIO_ITD);
 }
 /**
- * @brief 初始化指定的ADCx，时钟4分频(21MHz),采样间隔5个时钟脉冲，独立模式，DMA失能，数据右对齐，禁用扫描和连续转换，无外部触发边沿
- * @param RCC_AHB_GPIOx外设，RCC_ADCx外设，Pinx引脚编号，GPIOx，ADCx，ADC分辨率
- * @retval void
- * */
-void Simplified_ADCx_Init(uint32_t RCC_GPIOx, uint32_t RCC_ADCx, uint16_t Pinx, GPIO_TypeDef *GPIOx, ADC_TypeDef *ADCx, uint32_t Resolution)
-{
-    GPIO_InitTypeDef GPIO_ITD;
-    ADC_CommonInitTypeDef ADC_CITD;
-    ADC_InitTypeDef ADC_ITD;
-    RCC_AHB1PeriphClockCmd(RCC_GPIOx, ENABLE);
-    RCC_APB2PeriphClockCmd(RCC_ADCx, ENABLE);
-    GPIO_ITD.GPIO_Mode = GPIO_Mode_AN;
-    GPIO_ITD.GPIO_PuPd = GPIO_PuPd_NOPULL;
-    GPIO_ITD.GPIO_Pin = Pinx;
-    GPIO_Init(GPIOx, &GPIO_ITD);
-
-    RCC_APB2PeriphResetCmd(RCC_ADCx, ENABLE);
-    RCC_APB2PeriphResetCmd(RCC_ADCx, DISABLE);
-    ADC_CITD.ADC_DMAAccessMode = ADC_DMAAccessMode_Disabled;
-    ADC_CITD.ADC_Mode = ADC_Mode_Independent;
-    ADC_CITD.ADC_Prescaler = ADC_Prescaler_Div4;
-    ADC_CITD.ADC_TwoSamplingDelay = ADC_TwoSamplingDelay_5Cycles;
-    ADC_CommonInit(&ADC_CITD);
-    ADC_ITD.ADC_ScanConvMode = DISABLE;
-    ADC_ITD.ADC_ContinuousConvMode = DISABLE;
-    ADC_ITD.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
-    ADC_ITD.ADC_DataAlign = ADC_DataAlign_Right;
-    ADC_ITD.ADC_Resolution = Resolution;
-    ADC_ITD.ADC_NbrOfConversion = 1;
-    ADC_Init(ADCx, &ADC_ITD);
-    ADC_Cmd(ADCx, ENABLE);
-}
-/**
  * @brief 将指定的引脚上指定的TIM通道初始化为输入捕获模式
  * @param RCC_GPIO外设,RCC_TIM外设，TIM时钟线APBx，GPIO引脚编号，GPIOx，引脚复用GPIO_Pinsoure_x,GPIO复用的TIM编号，TIMx，TIM通道，TIM中断通道，TIM_IT_CCx,TIM分频系数(已经-1)
  * @retval void
@@ -348,4 +315,76 @@ void CalculateHighTime_InTIM(uint8_t *STA, uint32_t *VAL, TIM_TypeDef *TIMx, uin
         }
     }
     TIM_ClearITPendingBit(TIMx, IT_CC | TIM_IT_Update); //清除中断标志位
+}
+/**
+ * @brief 将指定引脚初始化为带上拉的输入模式
+ * @param RCC_GPIO外设，GPIOx，GPIO_Pin编号
+ * @retval void
+ * */
+void PullUp_GPIOx_Input_Init(uint32_t RCC_AHB_GPIOx, GPIO_TypeDef *GPIOx, uint16_t Pinx)
+{
+    GPIO_InitTypeDef GPIO_ITD;
+    RCC_AHB1PeriphClockCmd(RCC_AHB_GPIOx, ENABLE);
+    GPIO_ITD.GPIO_Mode = GPIO_Mode_IN;
+    GPIO_ITD.GPIO_PuPd = GPIO_PuPd_UP;
+    GPIO_ITD.GPIO_Speed = GPIO_Speed_25MHz;
+    GPIO_ITD.GPIO_Pin = Pinx;
+    GPIO_Init(GPIOx, &GPIO_ITD);
+}
+/**
+ * @brief 计算捕获的高电平时间并将其赋给传入的指针*AVG_HT,并将计算出的电机转速赋给传入的指针*AVG_rps(注：不同电机计算方法不同，请根据实际修改)
+ * @param 捕获标志*STA,高电平时长*VAL,平均次数，全局变量(用于存储高电平时间和),全局变量(用于存储转速和),全局变量(用于存储控制循环次数)
+ * @retval int,到达平均次数返回1，否则返回0
+ * */
+int Usart_HelpCalculateHighTime(uint8_t *STA, uint32_t *VAL, int AVG_times, float *Sum_HTV, int *Sum_rpsV, int *i, float *AVG_HT, int *AVG_rps, int *Is_ShowUsart)
+{
+    uint8_t CAP_STA = *STA;
+    uint32_t CAP_VAL = *VAL;
+    float Sum_HTV_temp = 0;
+    float AVG_HighTimeVal = 0;
+    int Sum_rpsV_temp = 0;
+    int AVG_rpsVal = 0;
+    int LoopControlVal = 0;
+
+    float temp = 0;
+    int rps = 0;
+    float fHz = 0;
+
+    Sum_HTV_temp = *Sum_HTV;
+    Sum_rpsV_temp = *Sum_rpsV;
+    LoopControlVal = *i;
+    if (CAP_STA & 0X80) //成功捕获到了一次高电平
+    {
+        temp = CAP_STA & 0X3F;
+        temp *= 0XFFFFFFFF; //溢出时间总和
+        temp += CAP_VAL;    //得到总的高电平时间
+        fHz = (1.0 / temp) * 1000000;
+        rps = fHz * 60 / 97;
+        Sum_HTV_temp += temp;
+        Sum_rpsV_temp += rps;
+        LoopControlVal++;
+        *Sum_HTV = Sum_HTV_temp;
+        *Sum_rpsV = Sum_rpsV_temp;
+        *i = LoopControlVal;
+
+        CAP_STA = 0; //开启下一次捕获
+        *STA = CAP_STA;
+        *Is_ShowUsart = 1;
+    }
+    if (LoopControlVal >= AVG_times)
+    {
+        AVG_HighTimeVal = Sum_HTV_temp / AVG_times;
+        AVG_rpsVal = Sum_rpsV_temp / AVG_times;
+        *AVG_HT = AVG_HighTimeVal;
+        *AVG_rps = AVG_rpsVal;
+
+        Sum_HTV_temp = 0;
+        Sum_rpsV_temp = 0;
+        LoopControlVal = 0;
+        *Sum_HTV = Sum_HTV_temp;
+        *Sum_rpsV = Sum_rpsV_temp;
+        *i = LoopControlVal;
+        return 1;
+    }
+    return 0;
 }
